@@ -1,6 +1,8 @@
 import csv
 import json
 import boto3
+import os
+from datetime import datetime, timezone
 from io import StringIO
 from urllib.request import Request, urlopen
 
@@ -66,3 +68,44 @@ def parse_latest_rates(csv_text):
             }
 
     return latest_rates
+
+def run_job(
+    bucket_name,
+    retrieved_at,
+    fetcher=fetch_ecb_csv,
+    s3_client=None,
+):
+    csv_text = fetcher()
+    rates = parse_latest_rates(csv_text)
+    document = build_document(rates, retrieved_at)
+
+    object_key = (
+        f"rates/{retrieved_at:%Y/%m/%d}/exchange-rates.json"
+    )
+
+    save_document_to_s3(
+        document=document,
+        bucket_name=bucket_name,
+        object_key=object_key,
+        s3_client=s3_client,
+    )
+
+    return {
+        "bucket": bucket_name,
+        "key": object_key,
+        "currencies": sorted(rates),
+    }
+
+def lambda_handler(event, context):
+    bucket_name = os.environ["BUCKET_NAME"]
+    retrieved_at = datetime.now(timezone.utc)
+
+    result = run_job(
+        bucket_name=bucket_name,
+        retrieved_at=retrieved_at,
+    )
+
+    return {
+        "statusCode": 200,
+        **result,
+    }

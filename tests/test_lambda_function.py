@@ -1,6 +1,7 @@
-from src.lambda_function import build_document, fetch_ecb_csv, parse_latest_rates, save_document_to_s3
+from src.lambda_function import build_document, fetch_ecb_csv, parse_latest_rates, save_document_to_s3, run_job
 from datetime import datetime, timezone
 import json
+import src.lambda_function as lambda_module
 
 
 SAMPLE_CSV = """CURRENCY,CURRENCY_DENOM,TIME_PERIOD,OBS_VALUE
@@ -92,3 +93,65 @@ def test_save_document_to_s3_sends_json():
         "ContentType": "application/json",
     }
     assert result == "rates/2026-08-28.json"
+
+def test_run_job_combines_all_steps():
+    class FakeS3Client:
+        def __init__(self):
+            self.arguments = None
+
+        def put_object(self, **arguments):
+            self.arguments = arguments
+
+    fake_s3 = FakeS3Client()
+    retrieved_at = datetime(
+        2026, 8, 28, 12, 30, tzinfo=timezone.utc
+    )
+
+    result = run_job(
+        bucket_name="test-bucket",
+        retrieved_at=retrieved_at,
+        fetcher=lambda: SAMPLE_CSV,
+        s3_client=fake_s3,
+    )
+
+    assert result == {
+        "bucket": "test-bucket",
+        "key": "rates/2026/08/28/exchange-rates.json",
+        "currencies": ["GBP", "USD"],
+    }
+
+    saved_document = json.loads(
+        fake_s3.arguments["Body"].decode("utf-8")
+    )
+    assert saved_document["base_currency"] == "EUR"
+    assert saved_document["rates"]["USD"]["date"] == "2026-08-27"
+
+def test_lambda_handler_uses_bucket_environment_variable(
+    monkeypatch,
+):
+    monkeypatch.setenv("BUCKET_NAME", "test-bucket")
+
+    def fake_run_job(bucket_name, retrieved_at):
+        assert bucket_name == "test-bucket"
+        assert retrieved_at.tzinfo == timezone.utc
+
+        return {
+            "bucket": bucket_name,
+            "key": "rates/test.json",
+            "currencies": ["USD"],
+        }
+
+    monkeypatch.setattr(
+        lambda_module,
+        "run_job",
+        fake_run_job,
+    )
+
+    result = lambda_module.lambda_handler({}, None)
+
+    assert result == {
+        "statusCode": 200,
+        "bucket": "test-bucket",
+        "key": "rates/test.json",
+        "currencies": ["USD"],
+    }
