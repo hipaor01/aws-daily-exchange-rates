@@ -28,11 +28,23 @@ data "aws_iam_policy_document" "github_assume_role" {
     }
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:hipaor01/aws-daily-exchange-rates:ref:refs/heads/main",
+        "repo:hipaor01/aws-daily-exchange-rates:*",
       ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:repository"
+      values   = ["hipaor01/aws-daily-exchange-rates"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:ref"
+      values   = ["refs/heads/main"]
     }
   }
 }
@@ -179,8 +191,8 @@ data "aws_iam_policy_document" "github_deploy" {
     ]
 
     resources = [
-      aws_iam_openid_connect_provider.github.arn,
-      aws_iam_role.github_actions.arn,
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-github-actions",
     ]
   }
 
