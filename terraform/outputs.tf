@@ -12,3 +12,8 @@ output "schedule_name" {
   description = "Nombre de la programación diaria"
   value       = aws_scheduler_schedule.daily.name
 }
+
+output "github_actions_role_arn" {
+  description = "Rol asumido por GitHub Actions mediante OIDC"
+  value       = aws_iam_role.github_actions.arn
+}
