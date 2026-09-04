@@ -28,10 +28,10 @@ data "aws_iam_policy_document" "github_assume_role" {
     }
 
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:hipaor01/aws-daily-exchange-rates:*",
+        "repo:hipaor01@54775548/aws-daily-exchange-rates@1349657706:ref:refs/heads/main",
       ]
     }
 
