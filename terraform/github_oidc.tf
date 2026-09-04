@@ -121,6 +121,7 @@ data "aws_iam_policy_document" "github_deploy" {
     ]
 
     resources = [
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}",
       "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}:*",
     ]
   }
